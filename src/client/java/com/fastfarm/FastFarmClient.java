@@ -9,39 +9,49 @@ import net.minecraft.block.CropBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.lwjgl.glfw.GLFW;
 
 public class FastFarmClient implements ClientModInitializer {
-	private static KeyBinding fastFarmKeybind;
+	private static KeyBinding breakKeybind;
+	private static KeyBinding placeKeybind;
 
 	@Override
 	public void onInitializeClient() {
-		// Register the keybinding
-		fastFarmKeybind = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-				"key.fastfarm.toggle",
+		// Register the keybindings
+		breakKeybind = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+				"key.fastfarm.break",
 				InputUtil.Type.KEYSYM,
-				GLFW.GLFW_KEY_F,
+				GLFW.GLFW_KEY_B,
+				"category.fastfarm"
+		));
+
+		placeKeybind = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+				"key.fastfarm.place",
+				InputUtil.Type.KEYSYM,
+				GLFW.GLFW_KEY_P,
 				"category.fastfarm"
 		));
 
 		// Register the event to check for keypress
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			if (client.player != null && fastFarmKeybind.wasPressed()) {
-				performFarmingAction(client.player);
+			if (client.player != null) {
+				if (breakKeybind.wasPressed()) {
+					performBreakingAction(client.player);
+				}
+				if (placeKeybind.wasPressed()) {
+					performPlacingAction(client.player);
+				}
 			}
 		});
 	}
 
-	private void performFarmingAction(PlayerEntity player) {
+	private void performBreakingAction(PlayerEntity player) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		World world = client.world;
 		BlockPos playerPos = player.getBlockPos();
@@ -59,9 +69,6 @@ public class FastFarmClient implements ClientModInitializer {
 				if (cropBlock.isMature(state)) {
 					// Break the crop block
 					breakCropBlock(client, pos);
-
-					// Attempt to replant the corresponding seed
-					replantCrop(player, world, pos, cropBlock);
 				}
 			}
 		}
@@ -73,12 +80,33 @@ public class FastFarmClient implements ClientModInitializer {
 		client.interactionManager.breakBlock(pos);
 	}
 
-	private void replantCrop(PlayerEntity player, World world, BlockPos pos, CropBlock cropBlock) {
-		ItemStack seedStack = getSeedForCrop(player, cropBlock);
+	private void performPlacingAction(PlayerEntity player) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		World world = client.world;
+		BlockPos playerPos = player.getBlockPos();
+
+		// Define the area to iterate over
+		BlockPos minPos = playerPos.add(-4, -1, -4);
+		BlockPos maxPos = playerPos.add(4, 1, 4);
+
+		// Iterate over all block positions in the area
+		for (BlockPos pos : BlockPos.iterate(minPos, maxPos)) {
+			BlockState state = world.getBlockState(pos);
+
+			// Check if the block is an empty farmland
+			if (state.getBlock() == Blocks.FARMLAND) {
+				// Attempt to replant crops
+				replantCrop(player, world, pos);
+			}
+		}
+	}
+
+	private void replantCrop(PlayerEntity player, World world, BlockPos pos) {
+		ItemStack seedStack = getSeedForCrop(player);
 
 		if (!seedStack.isEmpty()) {
 			// Use the seed from the player's inventory and place it at the position
-			world.setBlockState(pos, cropBlock.getDefaultState().with(CropBlock.AGE, 0), 3);
+			world.setBlockState(pos.up(), Blocks.WHEAT.getDefaultState().with(CropBlock.AGE, 0), 3);
 
 			// Decrement the seed stack if the player is not in creative mode
 			if (!player.isCreative()) {
@@ -87,27 +115,17 @@ public class FastFarmClient implements ClientModInitializer {
 		}
 	}
 
-	private ItemStack getSeedForCrop(PlayerEntity player, CropBlock cropBlock) {
-		// Determine the corresponding seed for the given crop block
-		ItemStack seedItem = ItemStack.EMPTY;
-		if (cropBlock == Blocks.WHEAT) {
-			seedItem = new ItemStack(Items.WHEAT_SEEDS);
-		} else if (cropBlock == Blocks.CARROTS) {
-			seedItem = new ItemStack(Items.CARROT);
-		} else if (cropBlock == Blocks.POTATOES) {
-			seedItem = new ItemStack(Items.POTATO);
-		} else if (cropBlock == Blocks.BEETROOTS) {
-			seedItem = new ItemStack(Items.BEETROOT_SEEDS);
-		}
-
-		// Search player's inventory for the seed item
+	private ItemStack getSeedForCrop(PlayerEntity player) {
+		// Find the first stack of seeds in the player's inventory
 		for (int i = 0; i < player.getInventory().size(); i++) {
 			ItemStack stack = player.getInventory().getStack(i);
-			if (!stack.isEmpty() && stack.getItem() == seedItem.getItem()) {
+			if (!stack.isEmpty() && (stack.getItem() == Items.WHEAT_SEEDS ||
+					stack.getItem() == Items.CARROT ||
+					stack.getItem() == Items.POTATO ||
+					stack.getItem() == Items.BEETROOT_SEEDS)) {
 				return stack;
 			}
 		}
-
 		return ItemStack.EMPTY;
 	}
 }
