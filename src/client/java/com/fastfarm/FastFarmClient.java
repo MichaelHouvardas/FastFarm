@@ -6,14 +6,17 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.CropBlock;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
+import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import org.lwjgl.glfw.GLFW;
 
@@ -39,7 +42,8 @@ public class FastFarmClient implements ClientModInitializer {
 	}
 
 	private void performFarmingAction(PlayerEntity player) {
-		World world = player.getWorld();
+		MinecraftClient client = MinecraftClient.getInstance();
+		World world = client.world;
 		BlockPos playerPos = player.getBlockPos();
 
 		// Define the area to iterate over
@@ -53,14 +57,20 @@ public class FastFarmClient implements ClientModInitializer {
 			// Check if the block is a fully grown crop
 			if (state.getBlock() instanceof CropBlock cropBlock) {
 				if (cropBlock.isMature(state)) {
-					// Break the crop block (drops should be handled automatically by the game)
-					world.breakBlock(pos, true);
+					// Break the crop block
+					breakCropBlock(client, pos);
 
 					// Attempt to replant the corresponding seed
 					replantCrop(player, world, pos, cropBlock);
 				}
 			}
 		}
+	}
+
+	private void breakCropBlock(MinecraftClient client, BlockPos pos) {
+		// Use MinecraftClient's built-in methods to interact with blocks
+		client.interactionManager.updateBlockBreakingProgress(pos, Direction.DOWN);
+		client.interactionManager.breakBlock(pos);
 	}
 
 	private void replantCrop(PlayerEntity player, World world, BlockPos pos, CropBlock cropBlock) {
