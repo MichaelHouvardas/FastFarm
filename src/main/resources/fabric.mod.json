@@ -19,7 +19,8 @@
 			"com.fastfarm.FastFarm"
 		],
 		"client": [
-			"com.fastfarm.FastFarmClient"
+			"com.fastfarm.FastFarmClient",
+			"com.fastfarm.TillDirt"
 		]
 	},
 	"mixins": [
