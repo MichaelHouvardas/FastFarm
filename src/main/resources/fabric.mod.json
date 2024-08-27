@@ -21,6 +21,7 @@
 		"client": [
 			"com.fastfarm.FastFarmClient",
 			"com.fastfarm.FastFarmPlace",
+			"com.fastfarm.GiveWheatAnimals",
 			"com.fastfarm.TillDirt"
 		]
 	},
